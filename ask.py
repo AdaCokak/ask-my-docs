@@ -9,7 +9,7 @@ INDEX_PATH = "faiss_index"
 # --- LOAD the saved vector store (fast — no re-embedding) ---
 embeddings = BedrockEmbeddings(model_id="amazon.titan-embed-text-v2:0", region_name="us-east-1")
 vectorstore = FAISS.load_local(INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
-retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
 
 # --- Set up Claude + the RAG chain ---
 llm = ChatBedrock(model_id="us.anthropic.claude-sonnet-4-6", region_name="us-east-1")
