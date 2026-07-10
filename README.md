@@ -37,3 +37,33 @@ advanced RAG phase.
 
 ## Current test corpus
 5 Wikipedia articles: Go, JavaScript, Java, Python, Rust
+
+## Phase D — Bedrock Knowledge Base Version
+
+The local FAISS RAG pipeline was rebuilt using Amazon Bedrock Knowledge Bases.
+
+New AWS-managed architecture:
+
+PDFs in S3 → Bedrock Knowledge Base → managed parser/chunking → Titan Text Embeddings V2 → managed vector store → Bedrock retrieval API → Claude answer generation
+
+### New files
+
+- `bedrock_kb_retrieve.py` — retrieves raw chunks from the Bedrock Knowledge Base and prints source documents.
+- `bedrock_kb_answer.py` — retrieves chunks, sends them to Claude, and answers with strict grounding.
+- `bedrock_kb_ask.py` — terminal chatbot version using the Bedrock Knowledge Base.
+- `evaluate_bedrock_kb.py` — evaluation script for the Bedrock KB version.
+
+### Evaluation result
+
+The Bedrock KB version passed 9/9 questions on the current evaluation set.
+
+| System | Score | Notes |
+|---|---:|---|
+| Local FAISS RAG | 8/9 | Failed on cross-document comparison |
+| Bedrock Knowledge Base | 9/9 | Correctly handled multi-document comparison |
+
+### Key learning
+
+Bedrock Knowledge Bases replaced the local FAISS vector store with a managed AWS vector store. Bedrock now handles parsing, chunking, embedding, indexing, and retrieval.
+
+However, retrieval alone is not enough. For out-of-scope questions, the Knowledge Base can still return irrelevant chunks. The application layer must use a strict prompt so Claude only answers from retrieved context and refuses unsupported questions.
