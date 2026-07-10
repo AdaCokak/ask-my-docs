@@ -105,3 +105,24 @@ The managed Knowledge Base handled the cross-document comparison question that t
 - Managed KBs require `managedSearchConfiguration` in the Retrieve API — `vectorSearchConfiguration` is not supported and returns an error.
 - Grounding is not automatic: strict prompt instructions ("answer only from retrieved documents; otherwise say you don't know") were required to stop the model answering out-of-scope questions from its own knowledge.
 - Fully-managed KB = no standalone vector database (OpenSearch/Aurora) in the account, so no idle hourly cost — only pay-per-use embeddings, retrieval, and generation.
+
+
+
+## Phase E — Real UK Legislation Ingestion
+
+Migrated from test PDFs to real UK legislation from the official legislation.gov.uk API — the point where the project became an actual regulatory-intelligence system.
+
+### Pipeline
+legislation.gov.uk API → XML extraction (metadata + body text) → S3 → Bedrock Knowledge Base → grounded, cited answers
+
+### Files
+- `extract_legislation.py` — parses legislation.gov.uk CLML XML, extracts clean metadata (title, description, modified date, provision count) and body text (from the `Primary` element)
+- `fetch_acts.py` — fetches multiple acts from the API, extracts each, saves ready for S3
+
+### Corpus (5 real UK acts)
+Data Protection Act 2018, Equality Act 2010, Modern Slavery Act 2015, Bribery Act 2010, Health and Safety at Work Act 1974. Each carries its real `modified` date — the key field for change-detection.
+
+### Key engineering notes
+- **CLML quirk:** legal content lives under the `Primary` element, not `Body` (diagnosed by inspecting the XML tree).
+- **SSL on macOS:** Python's `urllib` fails cert verification; switched to `requests` (the standard, and what the future Lambda ingestion will use).
+- **Corpus hygiene matters:** initially mixed legislation with programming

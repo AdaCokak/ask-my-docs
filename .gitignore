@@ -4,3 +4,7 @@ __pycache__/
 .env
 .aws/
 docs/
+# Legislation data files (regenerable via fetch_acts.py)
+*.xml
+*.txt
+!README.txt
