@@ -126,3 +126,21 @@ Data Protection Act 2018, Equality Act 2010, Modern Slavery Act 2015, Bribery Ac
 - **CLML quirk:** legal content lives under the `Primary` element, not `Body` (diagnosed by inspecting the XML tree).
 - **SSL on macOS:** Python's `urllib` fails cert verification; switched to `requests` (the standard, and what the future Lambda ingestion will use).
 - **Corpus hygiene matters:** initially mixed legislation with programming
+
+## Phase E (continued) — Structured Intelligence Extraction
+
+Beyond question-answering (RAG), the system now proactively extracts structured regulatory intelligence from each act.
+
+### File
+- `extract_intelligence.py` — sends each act's text to Claude with a strict JSON-only prompt (temperature 0, "do not invent facts"), extracting: title, what it regulates, who is affected, key obligations, and enforcement body. Batch-processes all acts into `intelligence.json`.
+
+### Output
+- `intelligence.json` — a machine-readable database of the regulatory corpus. Each law distilled into structured, filterable facts (e.g. "which laws affect employers?"). This is the difference between a search tool and an intelligence product — the analysis is done up front, not on demand.
+
+### Design notes
+- **Extraction vs RAG:** RAG is reactive (answers questions); extraction is proactive (pre-processes every document into structured data code can act on). The extracted JSON is exactly the output the Phase F agent will generate automatically on detecting a change.
+- **Grounding discipline:** `enforcement_body` returns `null` where the ingested text doesn't name one (e.g. Equality Act) but is populated where it does (e.g. Modern Slavery Act's Anti-slavery Commissioner) — proving the model extracts only what is present, never invents.
+- **Known limitation:** extraction quality is capped by ingestion scope. Currently only the `/introduction` section of each act is ingested (Level 1), so some fields (e.g. enforcement bodies like ICO/EHRC/HSE, which are defined deeper in each act) come back null. Not an extraction flaw — an input-coverage choice, deferred with the full-provision ingestion.
+
+### Phase E status
+Real legislation ingested from the government API → RAG Q&A over real law → cross-document reasoning working → structured intelligence extraction. Regulatory intelligence system functional end to end.

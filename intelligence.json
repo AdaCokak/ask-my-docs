@@ -1,0 +1,78 @@
+[
+  {
+    "act_title": "Bribery Act 2010",
+    "what_it_regulates": "Offences relating to bribery and connected purposes.",
+    "who_is_affected": [
+      "individuals who offer or receive bribes",
+      "commercial organisations",
+      "public officials",
+      "persons associated with commercial organisations"
+    ],
+    "key_obligations": [
+      "prohibition on offering, promising, or giving bribes",
+      "prohibition on requesting, agreeing to receive, or accepting bribes",
+      "prohibition on bribing foreign public officials",
+      "duty on commercial organisations to prevent bribery by associated persons"
+    ],
+    "enforcement_body": null,
+    "source_file": "bribery_act_2010.txt"
+  },
+  {
+    "act_title": "Equality Act 2010",
+    "what_it_regulates": "It harmonises and reforms equality law to prohibit discrimination, harassment, and victimisation related to personal characteristics, and imposes duties on public bodies and employers to promote equality and reduce socio-economic inequalities.",
+    "who_is_affected": [
+      "Ministers of the Crown",
+      "employers",
+      "public bodies",
+      "employees",
+      "individuals with protected characteristics",
+      "public procurement bodies"
+    ],
+    "key_obligations": [
+      "Ministers of the Crown and others must have regard to the desirability of reducing socio-economic inequalities when making strategic decisions",
+      "Certain employers may be required to publish information about pay differences between male and female employees",
+      "Prohibition of victimisation in certain circumstances",
+      "Certain functions must be exercised with regard to the need to eliminate discrimination and other prohibited conduct",
+      "Duties may be imposed in relation to the exercise of public procurement functions"
+    ],
+    "enforcement_body": null,
+    "source_file": "equality_act_2010.txt"
+  },
+  {
+    "act_title": "Health and Safety at Work etc. Act 1974",
+    "what_it_regulates": "The health, safety and welfare of persons at work, protection of others from work-related risks, control of dangerous substances, and control of certain atmospheric emissions.",
+    "who_is_affected": [
+      "persons at work",
+      "employers",
+      "employees",
+      "members of the public affected by work activities",
+      "persons keeping or using dangerous substances",
+      "persons responsible for atmospheric emissions"
+    ],
+    "key_obligations": [
+      "Securing the health, safety and welfare of persons at work",
+      "Protecting persons not at work against risks to health or safety arising from work activities",
+      "Controlling the keeping and use of dangerous substances",
+      "Preventing the unlawful acquisition, possession and use of dangerous substances",
+      "Controlling certain emissions into the atmosphere"
+    ],
+    "enforcement_body": null,
+    "source_file": "health_safety_work_1974.txt"
+  },
+  {
+    "act_title": "Modern Slavery Act 2015",
+    "what_it_regulates": "Slavery, servitude, forced or compulsory labour, and human trafficking, including protections for victims and the establishment of an Independent Anti-slavery Commissioner.",
+    "who_is_affected": [
+      "victims of slavery and human trafficking",
+      "perpetrators of slavery, servitude, forced labour, and human trafficking",
+      "Independent Anti-slavery Commissioner",
+      "organisations subject to transparency in supply chains requirements"
+    ],
+    "key_obligations": [
+      "Provision of protections for victims of slavery and human trafficking",
+      "Establishment and operation of an Independent Anti-slavery Commissioner"
+    ],
+    "enforcement_body": null,
+    "source_file": "modern_slavery_act_2015.txt"
+  }
+]
