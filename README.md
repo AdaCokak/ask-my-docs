@@ -1,146 +1,74 @@
-# Ask My Docs — RAG System on AWS Bedrock
+# Regulatory Intelligence System (Ask-My-Docs → RegIntel)
 
-A retrieval-augmented generation (RAG) system built on AWS Bedrock that answers 
-questions about documents using semantic search and Claude.
+An AI-powered regulatory-change intelligence system built on AWS Bedrock. It ingests real UK legislation from official government APIs, answers questions grounded in that legislation, detects which laws have changed recently, and uses an autonomous agent to reason across tools and deliver business-focused regulatory analysis.
+
+Built as a learning project by a recent CS graduate, evolving from a basic RAG chatbot into a full agentic system on AWS.
+
+## What it does
+
+- **Ingests real UK legislation** (Data Protection Act 2018, Equality Act 2010, Modern Slavery Act 2015, Bribery Act 2010, Health and Safety at Work Act 1974) from the legislation.gov.uk API, automatically on a daily schedule.
+- **Answers legal questions** grounded in the legislation, with source citations, via retrieval-augmented generation (RAG).
+- **Extracts structured intelligence** — what each law regulates, who it affects, key obligations — as machine-readable JSON.
+- **Detects recent changes** using each act's official modified date.
+- **Runs an autonomous agent** that reasons over a knowledge base and custom tools to answer questions like "which laws changed recently and how do they affect my business?"
 
 ## Architecture
 
-- **Ingestion:** PyPDFLoader → RecursiveCharacterTextSplitter (chunk_size=1000, 
-  overlap=150) → Amazon Titan Text Embeddings V2 → FAISS vector store
-- **Query:** FAISS similarity search (k=6) → Claude Sonnet on Bedrock → answer
+legislation.gov.uk API
+│
+▼
+Lambda (scheduled daily via EventBridge)
+├─ fetch acts → parse CLML XML → extract text + metadata
+├─ upload to S3
+└─ trigger Knowledge Base sync
+│
+▼
+S3 bucket ──► Bedrock Knowledge Base (managed vector store, Titan V2 embeddings)
+│
+▼
+Bedrock Agent (Claude Sonnet 4.6)
+├─ Knowledge Base (RAG over legislation)
+└─ Action group: detect-changes tool (Lambda reads S3, filters by modified date)
 
-## Files
+## Build phases
 
-- `ingest.py` — builds the vector index from PDFs (run once)
-- `ask.py` — terminal Q&A interface
-- `app.py` — Gradio browser chat interface
-- `evaluate.py` — evaluation suite
+- **Phase A** — Bedrock foundation: prompt engineering (system prompts, few-shot, JSON output, temperature).
+- **Phase B** — Local RAG pipeline: PyPDFLoader → text splitter → Titan embeddings → FAISS → Claude, with a Gradio UI. Ingestion separated from query.
+- **Phase C** — Evaluation & tuning: keyword-scored eval suite; tuned retrieval (k=6 optimal); documented cross-document-comparison limitation.
+- **Phase D** — Migrated to a fully-managed Amazon Bedrock Knowledge Base. Scored 9/9 vs local FAISS 8/9 (managed KB handled cross-document comparison FAISS failed). IAM verified least-privilege.
+- **Phase E** — Real UK legislation: fetch from government API → parse CLML XML (content under `Primary`, not `Body`) → S3 → KB. Structured intelligence extraction to JSON. Automated ingestion via Lambda + EventBridge (daily), with graceful handling of timeouts and concurrent-sync race conditions.
+- **Phase F** — Agentic layer: a Bedrock Agent (Agents Classic) with the legislation KB attached and a custom `detect-changes` action group (Lambda-backed tool). The agent autonomously decides to call the tool, reads the result, and delivers business-focused analysis.
 
-## Phase C Evaluation Results
+## Key files
 
-Eval set: 9 questions across 5 programming language documents.
+| File | Purpose |
+|------|---------|
+| `first_call.py` | Prompt engineering experiments (Phase A) |
+| `ingest.py` / `ask.py` / `app.py` | Local FAISS RAG pipeline + Gradio UI (Phase B) |
+| `evaluate.py` | Evaluation suite (Phase C) |
+| `bedrock_kb_*.py` | Bedrock Knowledge Base scripts (Phase D) |
+| `extract_legislation.py` / `fetch_acts.py` | Legislation fetch + CLML XML extraction (Phase E) |
+| `extract_intelligence.py` | Structured intelligence extraction to `intelligence.json` (Phase E) |
+| `lambda_ingest/lambda_function.py` | Scheduled ingestion Lambda (Phase E) |
+| `lambda_ingest/detect_changes.py` | Agent tool: detect recently-changed acts (Phase F) |
 
-| k value | Score | Notes |
-|---------|-------|-------|
-| k=3 | 7/9 (78%) | baseline |
-| k=6 | 8/9 (89%) | optimal |
-| k=10 | 8/9 (89%) | no further improvement |
+## Tech stack
 
-**Final setting: k=6**
+AWS Bedrock (Knowledge Bases, Agents, Claude Sonnet 4.6, Titan embeddings), AWS Lambda, EventBridge, S3, IAM, LangChain, FAISS, Gradio, Python.
 
-### Known limitation
-Cross-document comparison questions (e.g. "differences between Python and Java 
-typing") reliably fail because single-vector similarity search retrieves chunks 
-closest to the query semantically, which tends to pull from one document rather 
-than both. Fix requires query decomposition or hybrid search — planned for 
-advanced RAG phase.
+## Engineering notes & lessons
 
-## Current test corpus
-5 Wikipedia articles: Go, JavaScript, Java, Python, Rust
+- **Corpus hygiene matters** — mixed/duplicate documents pollute retrieval and confuse tools; deterministic filenames prevent debris accumulation.
+- **Grounding is a design choice** — the agent will blend retrieved content with model knowledge unless instructed to stay strictly grounded; critical for regulatory accuracy.
+- **Real production debugging** — solved Lambda deploy verification (SHA-256), timeouts, concurrent-ingestion race conditions (ConflictException handling), and Bedrock→Lambda resource-based permissions.
+- **Least privilege** — IAM roles and resource policies scoped to specific buckets/agents, not blanket access.
 
-## Phase D — Bedrock Knowledge Base Version
+## Known limitations (deliberate scope)
 
-The local FAISS RAG pipeline was rebuilt using Amazon Bedrock Knowledge Bases.
+- Ingests the `/introduction` section of each act (metadata-rich, content-light) to prove the multi-act pipeline. Full-provision ingestion and large-scale handling (streaming parsers, parallel processing, incremental change-detection) are documented as the scaling path.
+- Cross-document comparison via single-vector retrieval is limited (resolved by the managed KB; further improvable with query decomposition / reranking).
 
-New AWS-managed architecture:
+## Roadmap
 
-PDFs in S3 → Bedrock Knowledge Base → managed parser/chunking → Titan Text Embeddings V2 → managed vector store → Bedrock retrieval API → Claude answer generation
-
-### New files
-
-- `bedrock_kb_retrieve.py` — retrieves raw chunks from the Bedrock Knowledge Base and prints source documents.
-- `bedrock_kb_answer.py` — retrieves chunks, sends them to Claude, and answers with strict grounding.
-- `bedrock_kb_ask.py` — terminal chatbot version using the Bedrock Knowledge Base.
-- `evaluate_bedrock_kb.py` — evaluation script for the Bedrock KB version.
-
-### Evaluation result
-
-The Bedrock KB version passed 9/9 questions on the current evaluation set.
-
-| System | Score | Notes |
-|---|---:|---|
-| Local FAISS RAG | 8/9 | Failed on cross-document comparison |
-| Bedrock Knowledge Base | 9/9 | Correctly handled multi-document comparison |
-
-### Key learning
-
-Bedrock Knowledge Bases replaced the local FAISS vector store with a managed AWS vector store. Bedrock now handles parsing, chunking, embedding, indexing, and retrieval.
-
-However, retrieval alone is not enough. For out-of-scope questions, the Knowledge Base can still return irrelevant chunks. The application layer must use a strict prompt so Claude only answers from retrieved context and refuses unsupported questions.
-
-## Phase D — Migration to Amazon Bedrock Knowledge Base
-
-Migrated the RAG system from a hand-built local pipeline to a fully-managed AWS Bedrock Knowledge Base.
-
-### Architecture change
-
-**Before (Phase B — local):**
-PDFs → PyPDFLoader → text splitter → Titan embeddings → FAISS → Claude
-
-**After (Phase D — managed):**
-PDFs in S3 → Bedrock Knowledge Base (managed parsing, chunking, embeddings, vector store) → Retrieve API → Claude
-
-### Setup
-- **S3 bucket:** `ask-my-docs-kb-863760760863` (5 programming-language PDFs)
-- **Knowledge Base:** `ask-my-docs-bedrock-kb` (type: MANAGED, fully-managed vector store)
-- **Embeddings:** `amazon.titan-embed-text-v2:0`, 1024 dimensions
-- **IAM:** service role scoped to read-only access on the single KB bucket, account-conditioned (least privilege, verified)
-
-### Phase D files
-- `bedrock_kb_retrieve.py` — retrieves raw chunks from the KB, prints source documents
-- `bedrock_kb_answer.py` — retrieves chunks → Claude answers only from retrieved context
-- `bedrock_kb_ask.py` — interactive terminal chatbot on the Bedrock KB
-- `evaluate_bedrock_kb.py` — evaluation suite for the KB version
-
-### Results — Bedrock KB vs local FAISS
-
-| System | Score | Cross-document comparison |
-|--------|-------|---------------------------|
-| Local FAISS (Phase C) | 8/9 (89%) | ❌ failed |
-| Bedrock KB (Phase D) | 9/9 (100%) | ✅ passed |
-
-The managed Knowledge Base handled the cross-document comparison question that the hand-built FAISS system failed — a meaningful improvement.
-
-### Technical notes
-- Managed KBs require `managedSearchConfiguration` in the Retrieve API — `vectorSearchConfiguration` is not supported and returns an error.
-- Grounding is not automatic: strict prompt instructions ("answer only from retrieved documents; otherwise say you don't know") were required to stop the model answering out-of-scope questions from its own knowledge.
-- Fully-managed KB = no standalone vector database (OpenSearch/Aurora) in the account, so no idle hourly cost — only pay-per-use embeddings, retrieval, and generation.
-
-
-
-## Phase E — Real UK Legislation Ingestion
-
-Migrated from test PDFs to real UK legislation from the official legislation.gov.uk API — the point where the project became an actual regulatory-intelligence system.
-
-### Pipeline
-legislation.gov.uk API → XML extraction (metadata + body text) → S3 → Bedrock Knowledge Base → grounded, cited answers
-
-### Files
-- `extract_legislation.py` — parses legislation.gov.uk CLML XML, extracts clean metadata (title, description, modified date, provision count) and body text (from the `Primary` element)
-- `fetch_acts.py` — fetches multiple acts from the API, extracts each, saves ready for S3
-
-### Corpus (5 real UK acts)
-Data Protection Act 2018, Equality Act 2010, Modern Slavery Act 2015, Bribery Act 2010, Health and Safety at Work Act 1974. Each carries its real `modified` date — the key field for change-detection.
-
-### Key engineering notes
-- **CLML quirk:** legal content lives under the `Primary` element, not `Body` (diagnosed by inspecting the XML tree).
-- **SSL on macOS:** Python's `urllib` fails cert verification; switched to `requests` (the standard, and what the future Lambda ingestion will use).
-- **Corpus hygiene matters:** initially mixed legislation with programming
-
-## Phase E (continued) — Structured Intelligence Extraction
-
-Beyond question-answering (RAG), the system now proactively extracts structured regulatory intelligence from each act.
-
-### File
-- `extract_intelligence.py` — sends each act's text to Claude with a strict JSON-only prompt (temperature 0, "do not invent facts"), extracting: title, what it regulates, who is affected, key obligations, and enforcement body. Batch-processes all acts into `intelligence.json`.
-
-### Output
-- `intelligence.json` — a machine-readable database of the regulatory corpus. Each law distilled into structured, filterable facts (e.g. "which laws affect employers?"). This is the difference between a search tool and an intelligence product — the analysis is done up front, not on demand.
-
-### Design notes
-- **Extraction vs RAG:** RAG is reactive (answers questions); extraction is proactive (pre-processes every document into structured data code can act on). The extracted JSON is exactly the output the Phase F agent will generate automatically on detecting a change.
-- **Grounding discipline:** `enforcement_body` returns `null` where the ingested text doesn't name one (e.g. Equality Act) but is populated where it does (e.g. Modern Slavery Act's Anti-slavery Commissioner) — proving the model extracts only what is present, never invents.
-- **Known limitation:** extraction quality is capped by ingestion scope. Currently only the `/introduction` section of each act is ingested (Level 1), so some fields (e.g. enforcement bodies like ICO/EHRC/HSE, which are defined deeper in each act) come back null. Not an extraction flaw — an input-coverage choice, deferred with the full-provision ingestion.
-
-### Phase E status
-Real legislation ingested from the government API → RAG Q&A over real law → cross-document reasoning working → structured intelligence extraction. Regulatory intelligence system functional end to end.
+- Additional agent tools (full intelligence extraction per act) for multi-tool orchestration.
+- Production hardening: API Gateway front-end, Bedrock Guardrails, CloudWatch dashboards, pytest, CI/CD.
