@@ -53,16 +53,23 @@ def lambda_handler(event, context):
         s3.put_object(Bucket=BUCKET, Key=key, Body=content.encode("utf-8"))
         results.append({"act": title, "modified": modified, "key": key})
 
-    # After uploading all acts, trigger the KB to re-sync
-    sync = bedrock_agent.start_ingestion_job(
-        knowledgeBaseId=KB_ID,
-        dataSourceId=DATA_SOURCE_ID,
-    )
-    ingestion_job_id = sync["ingestionJob"]["ingestionJobId"]
+    # After uploading all acts, trigger the KB to re-sync.
+    # Gracefully handle the case where a sync is already running.
+    try:
+        sync = bedrock_agent.start_ingestion_job(
+            knowledgeBaseId=KB_ID,
+            dataSourceId=DATA_SOURCE_ID,
+        )
+        ingestion_job_id = sync["ingestionJob"]["ingestionJobId"]
+        sync_status = "started"
+    except bedrock_agent.exceptions.ConflictException:
+        ingestion_job_id = None
+        sync_status = "skipped - a sync was already in progress"
 
     return {
         "statusCode": 200,
         "acts_processed": len(results),
         "results": results,
+        "sync_status": sync_status,
         "ingestion_job_id": ingestion_job_id,
     }
