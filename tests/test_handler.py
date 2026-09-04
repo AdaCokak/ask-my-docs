@@ -44,7 +44,10 @@ def test_handler_reads_s3_and_returns_envelope():
         )
     }
 
-    with patch.object(tool.bedrock_runtime, "invoke_model", return_value=fake_bedrock_response):
+    fake_bedrock_client = MagicMock()
+    fake_bedrock_client.invoke_model.return_value = fake_bedrock_response
+
+    with patch.object(tool, "get_bedrock", return_value=fake_bedrock_client):
         result = tool.lambda_handler(_agent_event("modern slavery"), None)
 
     # 4. Assert the handler returned the correct Bedrock-agent envelope.

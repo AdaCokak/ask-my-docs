@@ -4,8 +4,20 @@ import json
 BUCKET = "ask-my-docs-kb-863760760863"
 MODEL_ID = "us.anthropic.claude-sonnet-4-6"
 
-s3 = boto3.client("s3")
-bedrock_runtime = boto3.client("bedrock-runtime")
+_s3 = None
+_bedrock_runtime = None
+
+def get_s3():
+    global _s3
+    if _s3 is None:
+        _s3 = boto3.client("s3")
+    return _s3
+
+def get_bedrock():
+    global _bedrock_runtime
+    if _bedrock_runtime is None:
+        _bedrock_runtime = boto3.client("bedrock-runtime")
+    return _bedrock_runtime
 
 # Map friendly act names the agent might use to their S3 filenames
 ACT_FILES = {
@@ -41,7 +53,7 @@ Do not invent facts; use null or empty lists if a field isn't in the text."""
         "system": system_prompt,
         "messages": [{"role": "user", "content": f"Extract intelligence from:\n\n{act_text}"}],
     }
-    response = bedrock_runtime.invoke_model(modelId=MODEL_ID, body=json.dumps(body))
+    response = get_bedrock().invoke_model(modelId=MODEL_ID, body=json.dumps(body))
     result = json.loads(response["body"].read())
     return result["content"][0]["text"]
 
@@ -57,7 +69,7 @@ def lambda_handler(event, context):
     if filepath is None:
         result_text = f"Could not find an act matching '{act_name}'. Available acts: Data Protection, Equality, Modern Slavery, Bribery, Health and Safety."
     else:
-        act_text = s3.get_object(Bucket=BUCKET, Key=filepath)["Body"].read().decode("utf-8")
+        act_text = get_s3().get_object(Bucket=BUCKET, Key=filepath)["Body"].read().decode("utf-8")
         intelligence = extract_intelligence(act_text)
         result_text = intelligence
 
