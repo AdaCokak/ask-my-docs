@@ -27,3 +27,29 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::863760760863:role/github-actions-deploy
+          aws-region: us-east-1
+
+      - name: Package and deploy extract-intelligence-tool
+        run: |
+          cd lambda_ingest
+          zip extract_intelligence_tool.zip extract_intelligence_tool.py
+          aws lambda update-function-code \
+            --function-name extract-intelligence-tool \
+            --zip-file fileb://extract_intelligence_tool.zip \
+            --region us-east-1
