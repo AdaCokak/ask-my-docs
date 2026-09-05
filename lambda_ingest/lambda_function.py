@@ -23,6 +23,8 @@ ACTS = [
 
 s3 = boto3.client("s3")
 bedrock_agent = boto3.client("bedrock-agent")
+dynamodb = boto3.resource("dynamodb")
+state_table = dynamodb.Table("legislation-state")
 
 def extract_from_xml(xml_bytes):
     root = ET.fromstring(xml_bytes)
@@ -40,6 +42,7 @@ def extract_from_xml(xml_bytes):
 
 def lambda_handler(event, context):
     results = []
+    changed_acts = []
 
     for name, act_path in ACTS:
         url = f"https://www.legislation.gov.uk/{act_path}/introduction/data.xml"
@@ -49,11 +52,30 @@ def lambda_handler(event, context):
         title, modified, description, text = extract_from_xml(xml_bytes)
         content = f"TITLE: {title}\nMODIFIED: {modified}\nDESCRIPTION: {description}\n\n{text}"
 
+        # Look up what we last saw for this act, and decide if it changed
+        stored = state_table.get_item(Key={"act_id": name}).get("Item")
+        previous_modified = stored["modified_date"] if stored else None
+        if previous_modified != modified:
+            changed_acts.append({"act": title, "was": previous_modified, "now": modified})
+
         key = f"legislation/{name}.txt"
         s3.put_object(Bucket=BUCKET, Key=key, Body=content.encode("utf-8"))
         results.append({"act": title, "modified": modified, "key": key})
 
-    # After uploading all acts, trigger the KB to re-sync.
+        # Save current state for next time
+        state_table.put_item(Item={"act_id": name, "modified_date": modified, "title": title})
+
+    # Only re-sync the KB if at least one act actually changed.
+    if not changed_acts:
+        return {
+            "statusCode": 200,
+            "acts_processed": len(results),
+            "changed_acts": [],
+            "sync_status": "skipped - no changes detected",
+            "ingestion_job_id": None,
+        }
+
+    # After uploading changed acts, trigger the KB to re-sync.
     # Gracefully handle the case where a sync is already running.
     try:
         sync = bedrock_agent.start_ingestion_job(
@@ -69,6 +91,7 @@ def lambda_handler(event, context):
     return {
         "statusCode": 200,
         "acts_processed": len(results),
+        "changed_acts": changed_acts,
         "results": results,
         "sync_status": sync_status,
         "ingestion_job_id": ingestion_job_id,
