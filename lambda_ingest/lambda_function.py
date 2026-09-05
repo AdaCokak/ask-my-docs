@@ -25,6 +25,8 @@ s3 = boto3.client("s3")
 bedrock_agent = boto3.client("bedrock-agent")
 dynamodb = boto3.resource("dynamodb")
 state_table = dynamodb.Table("legislation-state")
+sns = boto3.client("sns")
+ALERT_TOPIC_ARN = "arn:aws:sns:us-east-1:863760760863:legislation-change-alerts"
 
 def extract_from_xml(xml_bytes):
     root = ET.fromstring(xml_bytes)
@@ -74,6 +76,19 @@ def lambda_handler(event, context):
             "sync_status": "skipped - no changes detected",
             "ingestion_job_id": None,
         }
+
+    # Notify subscribers that legislation changed today.
+    lines = [f"- {c['act']}: was {c['was']}, now {c['now']}" for c in changed_acts]
+    message = (
+        f"{len(changed_acts)} UK act(s) changed today:\n\n"
+        + "\n".join(lines)
+        + "\n\nThe knowledge base is being updated with the latest versions."
+    )
+    sns.publish(
+        TopicArn=ALERT_TOPIC_ARN,
+        Subject=f"Regulatory alert: {len(changed_acts)} act(s) changed",
+        Message=message,
+    )
 
     # After uploading changed acts, trigger the KB to re-sync.
     # Gracefully handle the case where a sync is already running.
