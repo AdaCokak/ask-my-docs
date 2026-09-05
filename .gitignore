@@ -9,3 +9,5 @@ docs/
 *.txt
 !README.txt
 !requirements.txt
+lambda_ingest/package/
+lambda_ingest/*_bundled.zip
